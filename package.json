@@ -1,0 +1,18 @@
+{
+  "name": "books-rest-api",
+  "version": "2.0.0",
+  "description": "Production-grade Books REST API with live dashboard — Node.js & Express",
+  "main": "index.js",
+  "scripts": {
+    "start":  "node index.js",
+    "dev":    "nodemon index.js"
+  },
+  "keywords": ["rest-api", "express", "nodejs", "books", "crud", "dashboard"],
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

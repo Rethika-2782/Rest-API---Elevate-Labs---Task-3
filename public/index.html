@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>📚 Books API — Live Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #0a0a0f;
+    --surface:   #12121a;
+    --surface2:  #1c1c28;
+    --border:    #2a2a3a;
+    --accent:    #7c6aff;
+    --accent2:   #ff6ab0;
+    --green:     #4fffb0;
+    --yellow:    #ffd166;
+    --red:       #ff5c5c;
+    --text:      #e8e8f0;
+    --muted:     #6e6e88;
+    --font:      'Syne', sans-serif;
+    --mono:      'JetBrains Mono', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* animated grid bg */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(124,106,255,.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,106,255,.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  /* glow orbs */
+  .orb {
+    position: fixed; border-radius: 50%; filter: blur(100px);
+    pointer-events: none; z-index: 0; opacity: .4;
+    animation: drift 12s ease-in-out infinite alternate;
+  }
+  .orb1 { width: 600px; height: 600px; background: radial-gradient(circle, #7c6aff44, transparent 70%); top: -200px; right: -200px; }
+  .orb2 { width: 400px; height: 400px; background: radial-gradient(circle, #ff6ab033, transparent 70%); bottom: -100px; left: -100px; animation-delay: -6s; }
+
+  @keyframes drift { from { transform: translate(0,0) scale(1); } to { transform: translate(40px,30px) scale(1.1); } }
+
+  /* LAYOUT */
+  .shell { position: relative; z-index: 1; max-width: 1300px; margin: 0 auto; padding: 0 24px 80px; }
+
+  /* HEADER */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 28px 0 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+  }
+  .logo { display: flex; align-items: center; gap: 14px; }
+  .logo-icon {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: grid; place-items: center; font-size: 20px;
+    box-shadow: 0 0 20px #7c6aff55;
+  }
+  .logo-text h1 { font-size: 1.4rem; font-weight: 800; letter-spacing: -.5px; }
+  .logo-text span { font-size: .75rem; color: var(--muted); font-family: var(--mono); }
+  .health-badge {
+    display: flex; align-items: center; gap: 8px;
+    background: #4fffb015; border: 1px solid #4fffb030;
+    color: var(--green); padding: 7px 14px; border-radius: 999px;
+    font-size: .8rem; font-family: var(--mono);
+  }
+  .health-badge .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.8)} }
+
+  /* STAT CARDS */
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px; position: relative; overflow: hidden;
+    transition: border-color .2s, transform .2s;
+  }
+  .stat-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .stat-card::after {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    opacity: 0; transition: opacity .2s;
+  }
+  .stat-card:hover::after { opacity: 1; }
+  .stat-label { font-size: .72rem; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 10px; }
+  .stat-value { font-size: 2rem; font-weight: 800; }
+  .stat-sub { font-size: .75rem; color: var(--muted); margin-top: 4px; font-family: var(--mono); }
+  .stat-icon { position: absolute; right: 16px; top: 16px; font-size: 1.5rem; opacity: .15; }
+
+  /* TABS */
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; background: var(--surface); border-radius: 12px; padding: 4px; border: 1px solid var(--border); width: fit-content; }
+  .tab { padding: 8px 20px; border-radius: 9px; font-size: .85rem; font-weight: 600; cursor: pointer; transition: all .2s; color: var(--muted); border: none; background: transparent; font-family: var(--font); }
+  .tab.active { background: var(--accent); color: #fff; box-shadow: 0 0 16px #7c6aff55; }
+
+  /* PANEL */
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; overflow: hidden; }
+  .panel-head {
+    padding: 18px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .panel-title { font-weight: 700; font-size: 1rem; }
+
+  /* SEARCH + FILTER BAR */
+  .toolbar { display: flex; gap: 10px; padding: 16px 24px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .search-wrap { position: relative; flex: 1; min-width: 200px; }
+  .search-wrap input {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 9px 14px 9px 38px; border-radius: 10px;
+    font-family: var(--mono); font-size: .82rem; outline: none; transition: border-color .2s;
+  }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .search-wrap .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: .85rem; pointer-events: none; }
+  select, .toolbar input[type=text] {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    padding: 9px 12px; border-radius: 10px; font-family: var(--mono); font-size: .82rem; outline: none;
+    transition: border-color .2s; cursor: pointer;
+  }
+  select:focus { border-color: var(--accent); }
+
+  /* BUTTON */
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: 10px;
+    font-family: var(--font); font-size: .82rem; font-weight: 700; cursor: pointer; border: none;
+    transition: all .18s; white-space: nowrap;
+  }
+  .btn-primary { background: linear-gradient(135deg, var(--accent), #5b4de0); color: #fff; box-shadow: 0 0 16px #7c6aff44; }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 20px #7c6aff66; }
+  .btn-danger  { background: #ff5c5c18; color: var(--red); border: 1px solid #ff5c5c33; }
+  .btn-danger:hover  { background: #ff5c5c30; }
+  .btn-sm { padding: 5px 12px; font-size: .75rem; border-radius: 7px; }
+
+  /* TABLE */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted);
+    padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border);
+    cursor: pointer; user-select: none; white-space: nowrap;
+  }
+  thead th:hover { color: var(--text); }
+  tbody tr { border-bottom: 1px solid #1e1e2a; transition: background .15s; }
+  tbody tr:hover { background: var(--surface2); }
+  tbody td { padding: 13px 16px; font-size: .85rem; }
+  .genre-badge {
+    display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: .7rem;
+    font-family: var(--mono); font-weight: 500;
+  }
+  .stars { color: var(--yellow); font-size: .78rem; }
+
+  /* FORM PANEL */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 24px; }
+  .form-group { display: flex; flex-direction: column; gap: 7px; }
+  .form-group.full { grid-column: 1 / -1; }
+  label { font-size: .75rem; color: var(--muted); letter-spacing: .07em; text-transform: uppercase; }
+  .form-input {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    padding: 10px 14px; border-radius: 10px; font-family: var(--mono); font-size: .85rem;
+    outline: none; transition: border-color .2s, box-shadow .2s; width: 100%;
+  }
+  .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px #7c6aff22; }
+  .form-actions { grid-column: 1 / -1; display: flex; gap: 10px; }
+
+  /* LOGS */
+  .log-list { padding: 16px 24px; display: flex; flex-direction: column; gap: 8px; }
+  .log-entry {
+    display: flex; align-items: center; gap: 12px; font-family: var(--mono); font-size: .78rem;
+    padding: 8px 12px; border-radius: 8px; background: var(--surface2);
+    animation: fadeSlide .3s ease;
+  }
+  @keyframes fadeSlide { from { opacity:0; transform: translateY(-6px); } to { opacity:1; transform: none; } }
+  .method-badge {
+    padding: 2px 8px; border-radius: 5px; font-size: .68rem; font-weight: 700; min-width: 52px; text-align: center;
+  }
+  .GET    { background: #4fffb020; color: var(--green); }
+  .POST   { background: #7c6aff20; color: var(--accent); }
+  .PUT    { background: #ffd16620; color: var(--yellow); }
+  .PATCH  { background: #ffa50020; color: #ffa500; }
+  .DELETE { background: #ff5c5c20; color: var(--red); }
+
+  .status-ok  { color: var(--green); }
+  .status-err { color: var(--red); }
+  .log-path   { color: var(--text); flex: 1; }
+  .log-ms     { color: var(--muted); }
+  .log-time   { color: var(--muted); font-size: .7rem; }
+
+  /* RESPONSE VIEWER */
+  .response-box {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px; margin: 16px 24px; font-family: var(--mono); font-size: .78rem;
+    line-height: 1.7; max-height: 280px; overflow-y: auto; color: #b0b8d0;
+    display: none;
+  }
+  .response-box.show { display: block; }
+  .response-box .key   { color: #8fa4d8; }
+  .response-box .str   { color: #98d87c; }
+  .response-box .num   { color: var(--yellow); }
+  .response-box .bool  { color: var(--accent); }
+  .response-box .null  { color: var(--muted); }
+
+  /* TOAST */
+  #toast-container { position: fixed; bottom: 28px; right: 28px; z-index: 999; display: flex; flex-direction: column; gap: 10px; }
+  .toast {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 12px 18px; border-radius: 12px; font-size: .82rem;
+    animation: toastIn .3s ease; box-shadow: 0 8px 32px #00000066;
+    max-width: 340px;
+  }
+  .toast.success { border-color: #4fffb030; }
+  .toast.error   { border-color: #ff5c5c30; }
+  @keyframes toastIn  { from { opacity:0; transform: translateY(12px); } to { opacity:1; transform: none; } }
+  @keyframes toastOut { from { opacity:1; } to { opacity:0; transform: translateY(6px); } }
+
+  /* MISC */
+  .empty { text-align: center; padding: 60px 0; color: var(--muted); font-size: .9rem; }
+  .empty span { display: block; font-size: 2.5rem; margin-bottom: 10px; }
+  .section-gap { margin-top: 24px; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  @media (max-width: 768px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .form-grid  { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="orb orb1"></div>
+<div class="orb orb2"></div>
+
+<div class="shell">
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">📚</div>
+      <div class="logo-text">
+        <h1>Books API</h1>
+        <span>REST · Express · v2.0.0</span>
+      </div>
+    </div>
+    <div class="health-badge">
+      <span class="dot"></span>
+      <span id="health-text">Checking…</span>
+    </div>
+  </header>
+
+  <!-- STATS -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon">📖</div>
+      <div class="stat-label">Total Books</div>
+      <div class="stat-value" id="s-total">—</div>
+      <div class="stat-sub">in memory</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">⭐</div>
+      <div class="stat-label">Avg Rating</div>
+      <div class="stat-value" id="s-rating">—</div>
+      <div class="stat-sub">out of 5.0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">🏷</div>
+      <div class="stat-label">Genres</div>
+      <div class="stat-value" id="s-genres">—</div>
+      <div class="stat-sub">unique categories</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">⚡</div>
+      <div class="stat-label">Requests</div>
+      <div class="stat-value" id="s-requests">—</div>
+      <div class="stat-sub">logged this session</div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('books')">📚 Books</button>
+    <button class="tab" onclick="switchTab('add')">➕ Add / Edit</button>
+    <button class="tab" onclick="switchTab('tester')">🧪 API Tester</button>
+    <button class="tab" onclick="switchTab('logs')">📋 Request Log</button>
+  </div>
+
+  <!-- TAB: BOOKS -->
+  <div id="tab-books" class="tab-content active">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">Book Collection</span>
+        <button class="btn btn-primary" onclick="fetchBooks()">↻ Refresh</button>
+      </div>
+      <div class="toolbar">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="search-input" placeholder="Search title or author…" oninput="fetchBooks()">
+        </div>
+        <select id="filter-genre" onchange="fetchBooks()">
+          <option value="">All Genres</option>
+        </select>
+        <select id="sort-by" onchange="fetchBooks()">
+          <option value="id">Sort: ID</option>
+          <option value="title">Sort: Title</option>
+          <option value="author">Sort: Author</option>
+          <option value="rating">Sort: Rating</option>
+          <option value="year">Sort: Year</option>
+        </select>
+        <select id="sort-order" onchange="fetchBooks()">
+          <option value="asc">↑ Asc</option>
+          <option value="desc">↓ Desc</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Title</th><th>Author</th><th>Genre</th><th>Year</th><th>Rating</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="books-tbody"><tr><td colspan="7" class="empty"><span>⏳</span>Loading…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB: ADD/EDIT -->
+  <div id="tab-add" class="tab-content">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title" id="form-title">Add New Book</span>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Title *</label>
+          <input class="form-input" id="f-title" placeholder="e.g. The Great Gatsby" type="text">
+        </div>
+        <div class="form-group">
+          <label>Author *</label>
+          <input class="form-input" id="f-author" placeholder="e.g. F. Scott Fitzgerald" type="text">
+        </div>
+        <div class="form-group">
+          <label>Genre</label>
+          <input class="form-input" id="f-genre" placeholder="e.g. Classic" type="text">
+        </div>
+        <div class="form-group">
+          <label>Year</label>
+          <input class="form-input" id="f-year" placeholder="e.g. 1925" type="number" min="0" max="2025">
+        </div>
+        <div class="form-group">
+          <label>Rating (0–5)</label>
+          <input class="form-input" id="f-rating" placeholder="e.g. 4.5" type="number" step="0.1" min="0" max="5">
+        </div>
+        <div class="form-group">
+          <label>Edit ID <small style="color:var(--muted)">(leave blank to add)</small></label>
+          <input class="form-input" id="f-id" placeholder="ID to update…" type="number">
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-primary" onclick="submitForm()">💾 Save Book</button>
+          <button class="btn" style="background:var(--surface2);border:1px solid var(--border)" onclick="clearForm()">✕ Clear</button>
+        </div>
+      </div>
+      <div id="form-response" class="response-box"></div>
+    </div>
+  </div>
+
+  <!-- TAB: API TESTER -->
+  <div id="tab-tester" class="tab-content">
+    <div class="panel">
+      <div class="panel-head"><span class="panel-title">Live API Tester</span></div>
+      <div class="toolbar" style="gap:8px">
+        <select id="t-method" style="font-weight:700;min-width:90px">
+          <option>GET</option><option>POST</option><option>PUT</option>
+          <option>PATCH</option><option>DELETE</option>
+        </select>
+        <div class="search-wrap" style="flex:1">
+          <span class="search-icon">/</span>
+          <input type="text" id="t-path" value="/api/books" style="padding-left:24px">
+        </div>
+        <button class="btn btn-primary" onclick="runTest()">▶ Send</button>
+      </div>
+      <div style="padding:0 24px 16px">
+        <label style="font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">Request Body (JSON)</label>
+        <textarea id="t-body" class="form-input" rows="5" style="margin-top:8px;resize:vertical;width:100%"
+          placeholder='{"title": "My Book", "author": "Author Name"}'></textarea>
+      </div>
+      <!-- Quick presets -->
+      <div style="padding:0 24px 16px;display:flex;gap:8px;flex-wrap:wrap">
+        <span style="font-size:.72rem;color:var(--muted);align-self:center">Quick:</span>
+        <button class="btn btn-sm" style="background:var(--surface2);border:1px solid var(--border)" onclick="preset('GET','/api/books','')">GET all</button>
+        <button class="btn btn-sm" style="background:var(--surface2);border:1px solid var(--border)" onclick="preset('GET','/api/books/1','')">GET one</button>
+        <button class="btn btn-sm" style="background:var(--surface2);border:1px solid var(--border)" onclick="preset('POST','/api/books','{\n  &quot;title&quot;: &quot;New Book&quot;,\n  &quot;author&quot;: &quot;New Author&quot;,\n  &quot;genre&quot;: &quot;Fiction&quot;,\n  &quot;year&quot;: 2024,\n  &quot;rating&quot;: 4.2\n}')">POST</button>
+        <button class="btn btn-sm" style="background:var(--surface2);border:1px solid var(--border)" onclick="preset('PATCH','/api/books/1','{\n  &quot;rating&quot;: 5.0\n}')">PATCH</button>
+        <button class="btn btn-sm" style="background:var(--surface2);border:1px solid var(--border)" onclick="preset('DELETE','/api/books/1','')">DELETE</button>
+        <button class="btn btn-sm" style="background:var(--surface2);border:1px solid var(--border)" onclick="preset('GET','/api/stats','')">Stats</button>
+        <button class="btn btn-sm" style="background:var(--surface2);border:1px solid var(--border)" onclick="preset('GET','/api/health','')">Health</button>
+      </div>
+      <div id="t-response" class="response-box" style="margin:0 24px 24px"></div>
+    </div>
+  </div>
+
+  <!-- TAB: LOGS -->
+  <div id="tab-logs" class="tab-content">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="panel-title">Request Log <span id="log-count" style="color:var(--muted);font-weight:400;font-size:.85rem"></span></span>
+        <button class="btn btn-sm" style="background:var(--surface2);border:1px solid var(--border)" onclick="fetchLogs()">↻ Refresh</button>
+      </div>
+      <div id="log-list" class="log-list"><div class="empty"><span>📋</span>No logs yet</div></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+/* ── helpers ──────────────────────────────────── */
+const $ = id => document.getElementById(id);
+const BASE = '';
+
+function toast(msg, type = 'success') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${type === 'success' ? '✅' : '❌'}</span> ${msg}`;
+  $('toast-container').appendChild(el);
+  setTimeout(() => { el.style.animation = 'toastOut .3s ease forwards'; setTimeout(() => el.remove(), 300); }, 3000);
+}
+
+function syntaxHighlight(obj) {
+  const json = JSON.stringify(obj, null, 2);
+  return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, m => {
+    if (/^"/.test(m)) return /:$/.test(m) ? `<span class="key">${m}</span>` : `<span class="str">${m}</span>`;
+    if (/true|false/.test(m)) return `<span class="bool">${m}</span>`;
+    if (/null/.test(m)) return `<span class="null">${m}</span>`;
+    return `<span class="num">${m}</span>`;
+  });
+}
+
+const genreColors = {
+  Fiction: '#7c6aff', Dystopian: '#ff6ab0', Classic: '#ffd166', Technology: '#4fffb0',
+  'Non-Fiction': '#60c0ff', 'Self-Help': '#ff9960', Uncategorized: '#6e6e88'
+};
+function genreColor(g) { return genreColors[g] || '#b0b8d0'; }
+
+function starsHtml(r) {
+  if (!r) return '<span style="color:var(--muted)">—</span>';
+  const full = Math.floor(r), half = r % 1 >= .5;
+  return '★'.repeat(full) + (half ? '½' : '') + ` <small style="color:var(--muted)">${r}</small>`;
+}
+
+/* ── tab switching ──────────────────────────────── */
+function switchTab(name) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  $(`tab-${name}`).classList.add('active');
+  event.currentTarget.classList.add('active');
+  if (name === 'logs') fetchLogs();
+}
+
+/* ── stats & health ─────────────────────────────── */
+async function fetchStats() {
+  try {
+    const [health, stats] = await Promise.all([
+      fetch(`${BASE}/api/health`).then(r => r.json()),
+      fetch(`${BASE}/api/stats`).then(r => r.json()),
+    ]);
+    if (health.data) $('health-text').textContent = `Healthy · ${health.data.uptime} uptime`;
+    if (stats.data) {
+      $('s-total').textContent   = stats.data.totalBooks;
+      $('s-rating').textContent  = stats.data.avgRating;
+      $('s-genres').textContent  = Object.keys(stats.data.genres).length;
+      $('s-requests').textContent = stats.data.recentLogs?.length || 0;
+      // populate genre filter
+      const sel = $('filter-genre');
+      const existing = [...sel.options].map(o => o.value);
+      Object.keys(stats.data.genres).forEach(g => {
+        if (!existing.includes(g)) sel.innerHTML += `<option value="${g}">${g}</option>`;
+      });
+    }
+  } catch(e) { $('health-text').textContent = 'Offline'; }
+}
+
+/* ── books table ────────────────────────────────── */
+async function fetchBooks() {
+  const search = $('search-input').value;
+  const genre  = $('filter-genre').value;
+  const sortBy = $('sort-by').value;
+  const order  = $('sort-order').value;
+  const params = new URLSearchParams({ sortBy, order, limit: 50 });
+  if (search) params.set('search', search);
+  if (genre)  params.set('genre', genre);
+
+  const tbody = $('books-tbody');
+  tbody.innerHTML = `<tr><td colspan="7" class="empty"><span>⏳</span>Loading…</td></tr>`;
+  try {
+    const res  = await fetch(`${BASE}/api/books?${params}`);
+    const data = await res.json();
+    if (!data.data.length) { tbody.innerHTML = `<tr><td colspan="7" class="empty"><span>🔍</span>No books found</td></tr>`; return; }
+    tbody.innerHTML = data.data.map(b => `
+      <tr>
+        <td><span style="color:var(--muted);font-family:var(--mono);font-size:.78rem">#${b.id}</span></td>
+        <td><strong>${b.title}</strong></td>
+        <td style="color:var(--muted)">${b.author}</td>
+        <td><span class="genre-badge" style="background:${genreColor(b.genre)}22;color:${genreColor(b.genre)}">${b.genre || '—'}</span></td>
+        <td style="color:var(--muted);font-family:var(--mono)">${b.year || '—'}</td>
+        <td><span class="stars">${starsHtml(b.rating)}</span></td>
+        <td style="display:flex;gap:6px">
+          <button class="btn btn-sm" style="background:var(--surface2);border:1px solid var(--border)" onclick="editBook(${JSON.stringify(b).replace(/"/g,'&quot;')})">✏️</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteBook(${b.id},'${b.title.replace(/'/g,"\\'")}')">🗑</button>
+        </td>
+      </tr>`).join('');
+  } catch(e) { tbody.innerHTML = `<tr><td colspan="7" class="empty"><span>❌</span>Failed to load</td></tr>`; }
+}
+
+/* ── delete ─────────────────────────────────────── */
+async function deleteBook(id, title) {
+  if (!confirm(`Delete "${title}"?`)) return;
+  const res = await fetch(`${BASE}/api/books/${id}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (data.success) { toast(`"${title}" deleted`); fetchBooks(); fetchStats(); }
+  else toast(data.error?.message || 'Error', 'error');
+}
+
+/* ── edit ───────────────────────────────────────── */
+function editBook(book) {
+  $('f-id').value     = book.id;
+  $('f-title').value  = book.title;
+  $('f-author').value = book.author;
+  $('f-genre').value  = book.genre || '';
+  $('f-year').value   = book.year || '';
+  $('f-rating').value = book.rating || '';
+  $('form-title').textContent = `Edit Book #${book.id}`;
+  switchTab('add');
+  document.querySelectorAll('.tab')[1].classList.add('active');
+}
+
+/* ── form submit ────────────────────────────────── */
+async function submitForm() {
+  const id     = $('f-id').value;
+  const body   = {
+    title: $('f-title').value.trim(),
+    author: $('f-author').value.trim(),
+    genre:  $('f-genre').value.trim() || 'Uncategorized',
+  };
+  if ($('f-year').value)   body.year   = parseFloat($('f-year').value);
+  if ($('f-rating').value) body.rating = parseFloat($('f-rating').value);
+
+  const method = id ? 'PATCH' : 'POST';
+  const url    = id ? `${BASE}/api/books/${id}` : `${BASE}/api/books`;
+  try {
+    const res  = await fetch(url, { method, headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await res.json();
+    const resp = $('form-response');
+    resp.innerHTML = syntaxHighlight(data);
+    resp.classList.add('show');
+    if (data.success) { toast(data.message || 'Saved!'); clearForm(); fetchBooks(); fetchStats(); }
+    else toast(data.error?.message || 'Error', 'error');
+  } catch(e) { toast('Network error', 'error'); }
+}
+
+function clearForm() {
+  ['f-id','f-title','f-author','f-genre','f-year','f-rating'].forEach(id => $(id).value = '');
+  $('form-title').textContent = 'Add New Book';
+  $('form-response').classList.remove('show');
+}
+
+/* ── api tester ─────────────────────────────────── */
+function preset(method, path, body) {
+  $('t-method').value = method;
+  $('t-path').value   = path;
+  $('t-body').value   = body.replace(/&quot;/g, '"');
+}
+
+async function runTest() {
+  const method = $('t-method').value;
+  const path   = $('t-path').value;
+  const rawBody = $('t-body').value.trim();
+  const opts   = { method, headers: {} };
+  if (rawBody && ['POST','PUT','PATCH','DELETE'].includes(method)) {
+    opts.headers['Content-Type'] = 'application/json';
+    try { JSON.parse(rawBody); opts.body = rawBody; }
+    catch { toast('Invalid JSON body', 'error'); return; }
+  }
+  const t0 = performance.now();
+  try {
+    const res  = await fetch(`${BASE}${path}`, opts);
+    const ms   = (performance.now() - t0).toFixed(1);
+    const data = await res.json();
+    const resp = $('t-response');
+    resp.innerHTML = `<div style="color:var(--muted);margin-bottom:8px;font-size:.72rem">
+      HTTP ${res.status} · ${ms}ms · ${new Date().toLocaleTimeString()}
+    </div>` + syntaxHighlight(data);
+    resp.classList.add('show');
+    fetchStats();
+  } catch(e) { toast('Request failed: ' + e.message, 'error'); }
+}
+
+/* ── logs ───────────────────────────────────────── */
+async function fetchLogs() {
+  const res  = await fetch(`${BASE}/api/logs`);
+  const data = await res.json();
+  const list = data.data || [];
+  $('log-count').textContent = `(${list.length})`;
+  if (!list.length) { $('log-list').innerHTML = `<div class="empty"><span>📋</span>No logs yet</div>`; return; }
+  $('log-list').innerHTML = list.map(l => {
+    const statusClass = l.status < 400 ? 'status-ok' : 'status-err';
+    return `<div class="log-entry">
+      <span class="method-badge ${l.method}">${l.method}</span>
+      <span class="log-path">${l.path}</span>
+      <span class="${statusClass}">${l.status}</span>
+      <span class="log-ms">${l.ms}ms</span>
+      <span class="log-time">${new Date(l.time).toLocaleTimeString()}</span>
+    </div>`;
+  }).join('');
+}
+
+/* ── init ───────────────────────────────────────── */
+(async () => {
+  await fetchStats();
+  await fetchBooks();
+  // auto-refresh stats every 10s
+  setInterval(() => { fetchStats(); if ($('tab-logs').classList.contains('active')) fetchLogs(); }, 10000);
+})();
+</script>
+</body>
+</html>
